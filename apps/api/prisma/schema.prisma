@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String          @id @default(uuid())
+  name        String
+  email       String          @unique
+  password    String?
+  department  String
+  role        String
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  requests    Ticket[]        @relation("TicketRequester")
+  assigned    Ticket[]        @relation("TicketAssignee")
+  comments    TicketComment[]
+}
+
+model Queue {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  department  String
+  tickets     Ticket[]
+  createdAt   DateTime @default(now())
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  createdAt   DateTime @default(now())
+}
+
+model SlaRule {
+  id                 String   @id @default(uuid())
+  name               String
+  priority           String
+  responseMinutes    Int
+  resolutionMinutes  Int
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+}
+
+model Ticket {
+  id          String          @id @default(uuid())
+  protocol    String          @unique
+  title       String
+  description String          @db.Text
+  status      String          @default("NEW")
+  source      String          @default("PORTAL")
+  priority    String          @default("MEDIA")
+  urgency     Int             @default(2)
+  impact      Int             @default(2)
+  sector      String?
+  location    String?
+  requesterId String
+  assigneeId  String?
+  queueId     String?
+  categoryId  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  requester   User            @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee    User?           @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  queue       Queue?          @relation(fields: [queueId], references: [id])
+  category    Category?       @relation(fields: [categoryId], references: [id])
+  comments    TicketComment[]
+}
+
+model TicketComment {
+  id          String   @id @default(uuid())
+  ticketId    String
+  userId      String
+  body        String   @db.Text
+  isInternal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
