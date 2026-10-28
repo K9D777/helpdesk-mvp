@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "collection": "@nestjs/schematics",
+    "sourceRoot": "src"
+  },
+  "monorepo": false,
+  "sourceRoot": "src"
+}
