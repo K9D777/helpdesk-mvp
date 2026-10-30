@@ -1,3 +1,9 @@
+import * as bcrypt from 'bcryptjs';
+
+const adminPassword = await bcrypt.hash('admin123', 10);
+const suportePassword = await bcrypt.hash('suporte123', 10);
+const colaboradorPassword = await bcrypt.hash('colaborador123', 10);
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -5,11 +11,11 @@ const prisma = new PrismaClient();
 async function main() {
   const admin = await prisma.user.upsert({
     where: { email: 'admin@helpdesk.local' },
-    update: {},
+    update: { password: adminPassword },
     create: {
       name: 'Administrador',
       email: 'admin@helpdesk.local',
-      password: 'admin123',
+      password: adminPassword,
       department: 'TI',
       role: 'ADMIN',
     },
@@ -17,11 +23,11 @@ async function main() {
 
   const suporte = await prisma.user.upsert({
     where: { email: 'suporte@helpdesk.local' },
-    update: {},
+    update: { password: suportePassword },
     create: {
       name: 'Técnico Suporte',
       email: 'suporte@helpdesk.local',
-      password: 'suporte123',
+      password: suportePassword,
       department: 'TI',
       role: 'TECHNICIAN',
     },
@@ -29,11 +35,11 @@ async function main() {
 
   const colaborador = await prisma.user.upsert({
     where: { email: 'colaborador@helpdesk.local' },
-    update: {},
+    update: { password: colaboradorPassword },
     create: {
       name: 'Colaborador',
       email: 'colaborador@helpdesk.local',
-      password: 'colaborador123',
+      password: colaboradorPassword,
       department: 'Operações',
       role: 'REQUESTER',
     },

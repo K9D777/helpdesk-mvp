@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketGateway } from './ticket.gateway';
 
@@ -10,6 +10,12 @@ export class TicketsService {
   ) {}
 
   async createTicket(data: any) {
+    const requesterId = data.requesterId;
+
+    if (!requesterId) {
+      throw new BadRequestException('O id do solicitante é obrigatório');
+    }
+
     const ticket = await this.prisma.ticket.create({
       data: {
         protocol: `HD-${Date.now()}`,
@@ -23,7 +29,7 @@ export class TicketsService {
         sector: data.sector || null,
         location: data.location || null,
         requester: {
-          connect: { id: data.requesterId },
+          connect: { id: requesterId },
         },
         queue: data.queueId ? { connect: { id: data.queueId } } : undefined,
         category: data.categoryId ? { connect: { id: data.categoryId } } : undefined,

@@ -1,10 +1,27 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService) {}
+
+  private async isValidPassword(userPassword: string | null, password: string) {
+    if (!password) {
+      return false;
+    }
+
+    if (!userPassword) {
+      return password === 'admin123';
+    }
+
+    if (userPassword.startsWith('$2')) {
+      return bcrypt.compare(password, userPassword);
+    }
+
+    return userPassword === password;
+  }
 
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
@@ -15,9 +32,18 @@ export class AuthService {
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    const storedPassword = user.password || 'admin123';
-    if (password && storedPassword !== password) {
+    const isValid = await this.isValidPassword(user.password, password);
+
+    if (!isValid) {
       throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    if (user.password && !user.password.startsWith('$2')) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword },
+      });
     }
 
     const token = jwt.sign(
