@@ -20,6 +20,7 @@ model User {
   requests    Ticket[]        @relation("TicketRequester")
   assigned    Ticket[]        @relation("TicketAssignee")
   comments    TicketComment[]
+  audits      TicketAudit[]   @relation("TicketAuditUser")
 }
 
 model Queue {
@@ -37,13 +38,13 @@ model Category {
 }
 
 model SlaRule {
-  id                 String   @id @default(uuid())
-  name               String
-  priority           String
-  responseMinutes    Int
-  resolutionMinutes  Int
-  active             Boolean  @default(true)
-  createdAt          DateTime @default(now())
+  id                String   @id @default(uuid())
+  name              String
+  priority          String
+  responseMinutes   Int
+  resolutionMinutes Int
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
 }
 
 model Ticket {
@@ -70,16 +71,44 @@ model Ticket {
   queue       Queue?          @relation(fields: [queueId], references: [id])
   category    Category?       @relation(fields: [categoryId], references: [id])
   comments    TicketComment[]
+  audits      TicketAudit[]   @relation("TicketAuditTicket")
+  attachments TicketAttachment[]
 }
 
 model TicketComment {
-  id          String   @id @default(uuid())
-  ticketId    String
-  userId      String
-  body        String   @db.Text
-  isInternal  Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  ticketId   String
+  userId     String
+  body       String   @db.Text
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
 
-  ticket      Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket     Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TicketAudit {
+  id            String   @id @default(uuid())
+  ticketId      String
+  userId        String?
+  action        String
+  previousValue String?
+  newValue      String?
+  details       String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  ticket        Ticket @relation("TicketAuditTicket", fields: [ticketId], references: [id], onDelete: Cascade)
+  user          User?  @relation("TicketAuditUser", fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model TicketAttachment {
+  id         String   @id @default(uuid())
+  ticketId   String
+  fileName   String
+  mimeType   String
+  size       Int
+  storagePath String
+  createdAt  DateTime @default(now())
+
+  ticket     Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 }

@@ -1,12 +1,25 @@
 # Help Desk MVP
 
-Monorepo com backend NestJS + Prisma + MySQL + frontend React + painel em tempo real.
+Monorepo do MVP do sistema de help desk corporativo em Node.js + NestJS + React + MySQL.
+
+## Funcionalidades
+
+- Login com autenticação JWT
+- Gestão de filas e categorias
+- Abertura, acompanhamento e atualização de chamados
+- Comentários públicos e internos
+- Dashboard de métricas
+- Relatórios de SLA e produtividade
+- Auditoria de alterações
+- Notificações por e-mail via SMTP
+- Upload de anexos em pasta local
 
 ## Requisitos
 
 - Node.js 20+
 - npm 10+
 - Docker + Docker Compose
+- MySQL
 
 ## Como rodar
 
@@ -22,7 +35,7 @@ npm install
 docker compose up -d
 ```
 
-3. Configure o ambiente do backend:
+3. Configure o ambiente:
 
 ```bash
 cp apps/api/.env.example apps/api/.env
@@ -49,13 +62,8 @@ npm run dev
 - Email: admin@helpdesk.local
 - Senha: admin123
 
-## Funcionalidades MVP
+## Observações de produção
 
-- Login mockado
-- Portal de abertura de chamado
-- Fila de chamados
-- Atribuição e status
-- Comentários públicos/internos
-- Dashboard
-- Painel em tempo real por Socket.IO
-- Seed inicial com filas, categorias e usuários
+- Configure SMTP para enviar notificação de e-mail.
+- Ajuste as credenciais do banco em `apps/api/.env`.
+- Para anexos, a pasta `uploads/` será criada automaticamente no projeto.
