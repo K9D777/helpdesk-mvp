@@ -31,7 +31,7 @@ export class EmailService {
 
   async sendTicketNotification(to: string, subject: string, text: string) {
     if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      return { ok: true, mode: 'dry-run', message: 'SMTP não configurado. E-mail simulado.' };
+      return { ok: true, mode: 'dry-run' };
     }
 
     await this.transporter.sendMail({
