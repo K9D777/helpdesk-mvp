@@ -22,8 +22,18 @@ type Ticket = {
   impact: number;
   requester: User;
   assignee?: User;
-  comments?: any[];
+  comments?: Array<{ id: string; body: string; user?: User; isInternal?: boolean }>;
   createdAt: string;
+};
+
+type Summary = {
+  total?: number;
+  newTickets?: number;
+  inProgress?: number;
+  resolved?: number;
+  openByQueue?: Array<{ name: string; total: number }>;
+  statusBreakdown?: Array<{ status: string; total: number }>;
+  priorityBreakdown?: Array<{ priority: string; total: number }>;
 };
 
 const API_URL = 'http://localhost:3001';
@@ -34,21 +44,23 @@ export default function App() {
   const [email, setEmail] = useState('admin@helpdesk.local');
   const [password, setPassword] = useState('admin123');
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [summary, setSummary] = useState<any>(null);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [comment, setComment] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const socket = useMemo(() => io(API_URL), []);
 
   useEffect(() => {
     if (!isLogged) return;
 
-    socket.on('ticket:new', (payload) => {
+    socket.on('ticket:new', (payload: Ticket) => {
       setTickets((prev) => [payload, ...prev]);
-      alert(`Novo chamado: ${payload.title}`);
+      setStatusMessage(`Novo chamado: ${payload.title}`);
     });
 
-    socket.on('ticket:updated', (payload) => {
+    socket.on('ticket:updated', (payload: Ticket) => {
       setTickets((prev) => prev.map((t) => (t.id === payload.id ? payload : t)));
       if (selectedTicket?.id === payload.id) setSelectedTicket(payload);
     });
@@ -57,12 +69,21 @@ export default function App() {
   }, [isLogged, selectedTicket, socket]);
 
   const loadTickets = async () => {
-    const response = await axios.get(`${API_URL}/tickets`);
+    const request = filterStatus ? `${API_URL}/tickets?status=${filterStatus}` : `${API_URL}/tickets`;
+    const response = await axios.get(request, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+      },
+    });
     setTickets(response.data);
   };
 
   const loadSummary = async () => {
-    const response = await axios.get(`${API_URL}/tickets/summary`);
+    const response = await axios.get(`${API_URL}/dashboard`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+      },
+    });
     setSummary(response.data);
   };
 
@@ -74,8 +95,8 @@ export default function App() {
       localStorage.setItem('helpdesk_user', JSON.stringify(currentUser));
       setUser(currentUser);
       setIsLogged(true);
-      loadTickets();
-      loadSummary();
+      await loadTickets();
+      await loadSummary();
     } catch (error) {
       alert('Credenciais inválidas');
     }
@@ -84,25 +105,41 @@ export default function App() {
   const createTestTicket = async () => {
     if (!user) return;
 
-    const response = await axios.post(`${API_URL}/tickets`, {
-      title: 'Solicitação de acesso ao sistema de gestão',
-      description: 'Preciso de acesso ao portal de gestão.',
-      requesterId: user.id,
-      queueId: null,
-      categoryId: null,
-      priority: 'MEDIA',
-      urgency: 2,
-      impact: 2,
-      status: 'NEW',
-      source: 'PORTAL',
-    });
+    const response = await axios.post(
+      `${API_URL}/tickets`,
+      {
+        title: 'Solicitação de acesso ao sistema de gestão',
+        description: 'Preciso de acesso ao portal de gestão.',
+        requesterId: user.id,
+        queueId: null,
+        categoryId: null,
+        priority: 'MEDIA',
+        urgency: 2,
+        impact: 2,
+        status: 'NEW',
+        source: 'PORTAL',
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+        },
+      },
+    );
 
     setTickets((prev) => [response.data, ...prev]);
-    alert(`Chamado criado: ${response.data.protocol}`);
+    setStatusMessage(`Chamado criado: ${response.data.protocol}`);
   };
 
   const changeStatus = async (ticketId: string, status: string) => {
-    const response = await axios.patch(`${API_URL}/tickets/${ticketId}/status`, { status });
+    const response = await axios.patch(
+      `${API_URL}/tickets/${ticketId}/status`,
+      { status },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+        },
+      },
+    );
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? response.data : t)));
     if (selectedTicket?.id === ticketId) setSelectedTicket(response.data);
   };
@@ -110,13 +147,21 @@ export default function App() {
   const addComment = async () => {
     if (!selectedTicket || !comment.trim() || !user) return;
 
-    await axios.post(`${API_URL}/tickets/${selectedTicket.id}/comments`, {
-      userId: user.id,
-      body: comment,
-      isInternal: false,
-    });
+    await axios.post(
+      `${API_URL}/tickets/${selectedTicket.id}/comments`,
+      { body: comment, isInternal: false },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+        },
+      },
+    );
 
-    const response = await axios.get(`${API_URL}/tickets/${selectedTicket.id}`);
+    const response = await axios.get(`${API_URL}/tickets/${selectedTicket.id}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('helpdesk_token')}`,
+      },
+    });
     setSelectedTicket(response.data);
     setTickets((prev) => prev.map((t) => (t.id === selectedTicket.id ? response.data : t)));
     setComment('');
@@ -127,12 +172,18 @@ export default function App() {
     const savedToken = localStorage.getItem('helpdesk_token');
 
     if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser) as User;
+      setUser(parsedUser);
       setIsLogged(true);
       loadTickets();
       loadSummary();
     }
   }, []);
+
+  const visibleTickets = tickets.filter((ticket) => {
+    if (!filterStatus) return true;
+    return ticket.status === filterStatus;
+  });
 
   if (!isLogged) {
     return (
@@ -160,11 +211,14 @@ export default function App() {
         <p>{user?.name}</p>
         <small>{user?.role}</small>
         <button onClick={createTestTicket}>Abrir chamado</button>
-        <button onClick={loadTickets}>Atualizar fila</button>
-        <button onClick={() => {
-          localStorage.clear();
-          setIsLogged(false);
-        }}>
+        <button onClick={() => loadTickets()}>Atualizar fila</button>
+        <button
+          onClick={() => {
+            localStorage.clear();
+            setIsLogged(false);
+            setUser(null);
+          }}
+        >
           Sair
         </button>
       </aside>
@@ -173,26 +227,75 @@ export default function App() {
         <div className="cards">
           <div className="card">
             <span>Total</span>
-            <strong>{summary?.total || tickets.length}</strong>
+            <strong>{summary?.total ?? tickets.length}</strong>
           </div>
           <div className="card">
             <span>Novos</span>
-            <strong>{summary?.newTickets || 0}</strong>
+            <strong>{summary?.newTickets ?? 0}</strong>
           </div>
           <div className="card">
             <span>Em atendimento</span>
-            <strong>{summary?.inProgress || 0}</strong>
+            <strong>{summary?.inProgress ?? 0}</strong>
           </div>
           <div className="card">
             <span>Resolvidos</span>
-            <strong>{summary?.resolved || 0}</strong>
+            <strong>{summary?.resolved ?? 0}</strong>
+          </div>
+        </div>
+
+        <div className="summary-grid">
+          <div className="panel-block">
+            <h3>Status</h3>
+            <ul>
+              {(summary?.statusBreakdown ?? []).map((item) => (
+                <li key={item.status}>
+                  <span>{item.status}</span>
+                  <strong>{item.total}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="panel-block">
+            <h3>Prioridade</h3>
+            <ul>
+              {(summary?.priorityBreakdown ?? []).map((item) => (
+                <li key={item.priority}>
+                  <span>{item.priority}</span>
+                  <strong>{item.total}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="panel-block">
+            <h3>Filas</h3>
+            <ul>
+              {(summary?.openByQueue ?? []).map((item) => (
+                <li key={item.name}>
+                  <span>{item.name}</span>
+                  <strong>{item.total}</strong>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
         <div className="content-grid">
           <section className="list-panel">
-            <h3>Fila</h3>
-            {tickets.map((ticket) => (
+            <div className="list-header">
+              <h3>Fila</h3>
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                <option value="">Todos</option>
+                <option value="NEW">Novo</option>
+                <option value="IN_PROGRESS">Em atendimento</option>
+                <option value="RESOLVED">Resolvido</option>
+              </select>
+            </div>
+
+            <button className="secondary-btn" onClick={loadTickets}>Filtrar</button>
+
+            {visibleTickets.map((ticket) => (
               <div
                 key={ticket.id}
                 className={`ticket-item ${selectedTicket?.id === ticket.id ? 'active' : ''}`}
@@ -216,6 +319,11 @@ export default function App() {
                   <span>{selectedTicket.protocol}</span>
                 </div>
 
+                <div className="meta-row">
+                  <span>Prioridade: {selectedTicket.priority}</span>
+                  <span>Status: {selectedTicket.status}</span>
+                </div>
+
                 <p>{selectedTicket.description}</p>
 
                 <div className="actions">
@@ -224,11 +332,13 @@ export default function App() {
                   <button onClick={() => changeStatus(selectedTicket.id, 'NEW')}>Novo</button>
                 </div>
 
+                {statusMessage && <div className="toast">{statusMessage}</div>}
+
                 <div className="comments-box">
                   <h4>Comentários</h4>
                   {(selectedTicket.comments || []).map((commentItem) => (
                     <div key={commentItem.id} className="comment-item">
-                      <strong>{commentItem.user?.name}</strong>
+                      <strong>{commentItem.user?.name || 'Usuário'}</strong>
                       <p>{commentItem.body}</p>
                     </div>
                   ))}
